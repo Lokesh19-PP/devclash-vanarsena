@@ -95,6 +95,46 @@ export default function MainExplorer() {
   }, [repoId]);
   const [expandedFolders, setExpandedFolders] = useState<string[]>(['root']);
   const [activeInfoTab, setActiveInfoTab] = useState<'details' | 'code' | 'chat'>('details');
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [chatHistory, setChatHistory] = useState<{role: 'user'|'assistant', content: string}[]>([]);
+
+  // Clear chat history when selecting a new node
+  useEffect(() => {
+    setChatHistory([]);
+  }, [selectedNodeId]);
+
+  const handleSendChat = async () => {
+    if (!chatInput.trim() || !activeNode || isChatLoading) return;
+    
+    const query = chatInput.trim();
+    setChatInput('');
+    setChatHistory(prev => [...prev, {role: 'user', content: query}]);
+    setIsChatLoading(true);
+
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/v1/chat/node`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          node_id: activeNode.id,
+          node_code: activeNode.code,
+          node_summary: activeNode.summary,
+          query: query,
+          history: chatHistory
+        })
+      });
+
+      if (!res.ok) throw new Error('API Error');
+      const data = await res.json();
+      setChatHistory(prev => [...prev, {role: 'assistant', content: data.response}]);
+    } catch (err) {
+      console.error(err);
+      setChatHistory(prev => [...prev, {role: 'assistant', content: 'Neural link disrupted. Communication with Groq failed.'}]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
 
   const toggleFolder = (folder: string) => {
     setExpandedFolders(prev => 
@@ -388,28 +428,55 @@ export default function MainExplorer() {
                       exit={{ opacity: 0, y: -20 }}
                       className="flex flex-col h-full gap-6"
                     >
-                      <div className="flex-1 space-y-4">
-                         <div className="flex gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center shrink-0">
-                               <Sparkles size={14} className="text-accent" />
+                      <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2 pb-4">
+                         {chatHistory.length === 0 && (
+                            <div className="flex gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center shrink-0">
+                                  <Sparkles size={14} className="text-accent" />
+                                </div>
+                                <div className="bg-white/5 border border-white/10 p-4 rounded-2xl rounded-tl-none text-sm text-white/80 leading-relaxed">
+                                  System linked to {activeNode?.label || 'node'}. I have access to the file's code and structural role. What architectural insights do you need?
+                                </div>
                             </div>
-                            <div className="bg-white/5 border border-white/10 p-4 rounded-2xl rounded-tl-none text-sm text-white/80 leading-relaxed">
-                               System linked. I'm analyzing the 24 dependencies of this node. What architectural insights do you need?
+                         )}
+                         {chatHistory.map((msg, i) => (
+                           <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                              {msg.role === 'assistant' && (
+                                <div className="w-8 h-8 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center shrink-0 mt-1">
+                                  <Sparkles size={14} className="text-accent" />
+                                </div>
+                              )}
+                              <div className={`${msg.role === 'user' ? 'bg-accent/20 border border-accent/40 rounded-tr-none text-white/90' : 'bg-white/5 border border-white/10 rounded-tl-none text-white/80'} p-4 rounded-2xl text-sm leading-relaxed max-w-[85%] whitespace-pre-wrap`}>
+                                 {msg.content}
+                              </div>
+                           </div>
+                         ))}
+                         {isChatLoading && (
+                            <div className="flex gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center shrink-0">
+                                  <div className="w-3 h-3 rounded-full bg-accent animate-ping" />
+                                </div>
+                                <div className="bg-white/5 border border-white/10 p-4 rounded-2xl rounded-tl-none text-sm text-white/50 italic">
+                                  Computing neural response...
+                                </div>
                             </div>
-                         </div>
-                         <div className="flex gap-3 justify-end">
-                            <div className="bg-accent/20 border border-accent/40 p-4 rounded-2xl rounded-tr-none text-sm text-white/90">
-                               Explain the high risk factor.
-                            </div>
-                         </div>
+                         )}
                       </div>
-                      <div className="mt-auto relative">
+                      <div className="mt-auto relative shrink-0">
                          <input 
                            type="text" 
+                           value={chatInput}
+                           onChange={(e) => setChatInput(e.target.value)}
+                           onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
+                           disabled={isChatLoading}
                            placeholder="Type a neural query..."
-                           className="w-full bg-black/40 border border-white/10 rounded-2xl py-4 pl-6 pr-14 text-sm text-white focus:outline-none focus:border-accent/50 transition-all"
+                           className="w-full bg-black/40 border border-white/10 rounded-2xl py-4 pl-6 pr-14 text-sm text-white focus:outline-none focus:border-accent/50 transition-all disabled:opacity-50"
                          />
-                         <button className="absolute right-4 top-1/2 -translate-y-1/2 text-accent p-2 hover:bg-accent/10 rounded-xl transition-all">
+                         <button 
+                           onClick={handleSendChat}
+                           disabled={isChatLoading || !chatInput.trim()}
+                           className="absolute right-4 top-1/2 -translate-y-1/2 text-accent p-2 hover:bg-accent/10 rounded-xl transition-all disabled:opacity-50"
+                         >
                             <ArrowUpRight size={20} />
                          </button>
                       </div>

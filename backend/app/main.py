@@ -67,9 +67,10 @@ app.add_middleware(
 
 api_router = APIRouter(prefix="/api/v1")
 
-from app.routers import graph, repos
+from app.routers import graph, repos, chat
 api_router.include_router(graph.router)
 api_router.include_router(repos.router)
+api_router.include_router(chat.router)
 
 @app.get("/health")
 async def health_check():

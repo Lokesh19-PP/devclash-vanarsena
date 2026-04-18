@@ -1,0 +1,28 @@
+# Environment variables
+.env
+backend/.env
+frontend/.env
+*.env
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# Build artifacts
+dist/
+build/
+.next/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Analysis artifacts
+backend/cloned_repos/
