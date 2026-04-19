@@ -98,6 +98,7 @@ export default function MainExplorer() {
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState<{role: 'user'|'assistant', content: string}[]>([]);
+  const [fileSearch, setFileSearch] = useState('');
 
   // Clear chat history when selecting a new node
   useEffect(() => {
@@ -142,9 +143,15 @@ export default function MainExplorer() {
     );
   };
 
+  // Filter nodes for the sidebar
+  const displayedNodes = nodes.filter(node => 
+    (node.id || '').toLowerCase().includes(fileSearch.toLowerCase()) || 
+    (node.label || '').toLowerCase().includes(fileSearch.toLowerCase())
+  );
+
   // Dynamically group files
   const filesByFolder: Record<string, any[]> = { 'root': [] };
-  nodes.forEach(node => {
+  displayedNodes.forEach(node => {
      if (node.type === 'dir') return;
      const relativePath = (node.path || (node.id.includes(':') ? node.id.split(':').slice(1).join(':') : node.id)) as string;
      const parts = relativePath.split('/');
@@ -168,7 +175,23 @@ export default function MainExplorer() {
   const topbarRight = null;
 
   const sidebarContent = (
-    <div className="flex flex-col py-4 font-sans text-[14px] select-none bg-transparent">
+    <div className="flex flex-col font-sans text-[14px] select-none bg-transparent h-full">
+      {/* File Search Bar */}
+      <div className="px-6 py-4 border-b border-white/5 bg-white/[0.02]">
+        <div className="relative group">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-accent transition-colors" />
+          <input 
+            type="text"
+            placeholder="Filter files..."
+            value={fileSearch}
+            onChange={(e) => setFileSearch(e.target.value)}
+            className="w-full bg-black/40 border border-white/5 rounded-xl py-2 pl-9 pr-4 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-accent/40 focus:bg-black/60 transition-all"
+          />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto no-scrollbar py-2">
+
       {/* Root Folder */}
       <div 
         className="flex items-center px-6 py-3 hover:bg-white/5 cursor-pointer text-white group transition-all"
@@ -235,6 +258,7 @@ export default function MainExplorer() {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 

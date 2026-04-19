@@ -22,10 +22,10 @@ interface EdgeData {
 }
 
 const edgeTypeColors: Record<string, string> = {
-  imports: '#64748b',
-  extends: '#a855f7',
-  calls: '#22d3ee',
-  contains: '#3f4f63',
+  imports: '#94a3b8', // Brighter slate
+  extends: '#c084fc', // Brighter purple
+  calls: '#38bdf8',   // Brighter cyan
+  contains: '#334155',
 };
 
 const colors: Record<string, string> = {
@@ -169,56 +169,85 @@ const Node = ({ data, isSelected, onClick }: { data: NodeData; isSelected: boole
 
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 
-// Connection Component with "Laser Glow"
+// Connection Component with "Laser Glow" and directional flow
 const Connection = ({
   start,
   end,
   color,
   edgeKind,
+  isActive,
+  isDimmed,
 }: {
   start: [number, number, number];
   end: [number, number, number];
   color: string;
   edgeKind?: string;
+  isActive: boolean;
+  isDimmed: boolean;
 }) => {
   const lineRef = useRef<any>(null);
-  const glowRef = useRef<any>(null);
+  const flowRef = useRef<any>(null);
   const isTree = edgeKind === 'contains';
-  // Enhanced Edge Visibility
-  const coreW = isTree ? 1.2 : 2.5;
-  const glowW = isTree ? 2.5 : 6;
-  const coreOp = isTree ? 0.7 : 1.0;
-  const glowOp = isTree ? 0.25 : 0.5;
+  
+  // UX: Directional Indicator (Cone at target)
+  const dir = useMemo(() => {
+    const s = new THREE.Vector3(...start);
+    const e = new THREE.Vector3(...end);
+    return e.clone().sub(s).normalize();
+  }, [start, end]);
 
-  useFrame(() => {
-    if (lineRef.current) lineRef.current.dashOffset -= 0.01;
-    if (glowRef.current) glowRef.current.dashOffset -= 0.01;
+  const targetPoint = useMemo(() => new THREE.Vector3(...end), [end]);
+  const arrowPos = useMemo(() => {
+    const s = new THREE.Vector3(...start);
+    const e = new THREE.Vector3(...end);
+    return s.clone().lerp(e, 0.95); // Position arrow near the end
+  }, [start, end]);
+
+  // Adjust visibility based on state
+  const opacity = isDimmed ? 0.05 : isActive ? 1.0 : (isTree ? 0.2 : 0.6);
+  const lineWidth = isActive ? 4 : (isTree ? 1 : 2);
+
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime();
+    if (lineRef.current) {
+      lineRef.current.dashOffset = -t * 0.5;
+    }
+    if (flowRef.current) {
+      flowRef.current.position.lerpVectors(new THREE.Vector3(...start), new THREE.Vector3(...end), (t * 0.5) % 1);
+    }
   });
 
   return (
     <group>
-      <Line
-        ref={glowRef}
-        points={[start, end]}
-        color={color}
-        lineWidth={glowW}
-        transparent
-        opacity={glowOp}
-        dashed
-        dashScale={8}
-        dashSize={isTree ? 0.2 : 0.4}
-      />
+      {/* Main Connection Line */}
       <Line
         ref={lineRef}
         points={[start, end]}
         color={color}
-        lineWidth={coreW}
+        lineWidth={lineWidth}
         transparent
-        opacity={coreOp}
-        dashed
-        dashScale={8}
-        dashSize={isTree ? 0.2 : 0.4}
+        opacity={opacity}
+        dashed={!isTree}
+        dashScale={5}
+        dashSize={0.5}
       />
+
+      {/* Pulsing Flow Particle (UX: Shows direction of data/imports) */}
+      {!isTree && !isDimmed && (
+        <mesh ref={flowRef}>
+          <sphereGeometry args={[0.08, 16, 16]} />
+          <meshBasicMaterial color={color} transparent opacity={0.8} />
+          <pointLight distance={1} intensity={isActive ? 2 : 1} color={color} />
+        </mesh>
+      )}
+
+      {/* Directional Arrow Head */}
+      {!isTree && !isDimmed && (
+        <mesh position={arrowPos} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)}>
+          <coneGeometry args={[0.12, 0.3, 8]} />
+          <meshBasicMaterial color={color} transparent opacity={opacity} />
+        </mesh>
+      )}
     </group>
   );
 };
@@ -263,8 +292,14 @@ function Scene({ nodes, edges, selectedId, onSelect }: { nodes: NodeData[]; edge
           const startNode = nodes.find(n => n.id === edge.source);
           const endNode = nodes.find(n => n.id === edge.target);
           if (!startNode || !endNode) return null;
+          
+          const isConnectedToSelected = selectedId === edge.source || selectedId === edge.target;
+          const isDimmed = !!selectedId && !isConnectedToSelected;
+          const isActive = !!selectedId && isConnectedToSelected;
+
           const edgeKind = (edge.type || 'imports').toLowerCase();
           const lineColor = edgeTypeColors[edgeKind] ?? colors[startNode.role.toLowerCase() as keyof typeof colors] ?? colors.util;
+          
           return (
             <Connection 
               key={edge.id} 
@@ -272,6 +307,8 @@ function Scene({ nodes, edges, selectedId, onSelect }: { nodes: NodeData[]; edge
               end={endNode.position} 
               color={lineColor}
               edgeKind={edgeKind}
+              isActive={isActive}
+              isDimmed={isDimmed}
             />
           );
         })}

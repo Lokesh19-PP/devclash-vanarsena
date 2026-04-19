@@ -109,22 +109,6 @@ export default function IDELayout({ children, topbarCenter, topbarRight, sidebar
         </div>
       </div>
 
-      {/* Status Bar */}
-      <div className="h-6 bg-black/60 backdrop-blur-md border-t border-white/5 flex items-center justify-between px-3 text-[10px] font-mono shrink-0 z-20 text-white/60">
-        <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1.5 font-bold text-accent">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
-            CONNECTED
-          </span>
-          <span className="opacity-40">UTF-8</span>
-          <span className="opacity-40 uppercase">Mayur Branch</span>
-          <span className="opacity-40">© 2024</span>
-        </div>
-        <div className="flex items-center gap-4 opacity-40">
-          <Link to="#" className="hover:opacity-100 transition-opacity">Docs</Link>
-          <Link to="#" className="hover:opacity-100 transition-opacity">System</Link>
-        </div>
-      </div>
     </div>
   );
 }
