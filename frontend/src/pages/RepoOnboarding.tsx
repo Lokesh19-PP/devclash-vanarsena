@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Link2, Sparkles, Zap, Shield, GitBranch, History, TrendingUp, ChevronRight, Terminal } from 'lucide-react';
-import IDELayout from '../components/IDE/IDELayout';
+import { Link2, Sparkles, Zap, Shield, GitBranch, History, TrendingUp, ChevronRight, Terminal, ArrowLeft, ArrowRight, Code2, FolderOpen, Cpu } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import Plasma from '../components/Visualization/Plasma';
 
 export default function RepoOnboarding() {
   const navigate = useNavigate();
@@ -31,71 +31,99 @@ export default function RepoOnboarding() {
   ];
 
   return (
-    <IDELayout>
-      <div className="w-full h-full flex flex-col items-center justify-center p-8 relative overflow-hidden bg-transparent">
+    <div className="w-screen h-screen flex flex-col relative overflow-hidden bg-black font-sans">
+      
+      {/* Custom Glassmorphic Navbar (Matching Landing.tsx) */}
+      <nav className="fixed top-0 left-0 w-full z-[100] h-20 backdrop-blur-xl bg-black/20 flex items-center px-8 md:px-16 border-b border-white/5 gap-6">
+        <button 
+          onClick={() => navigate('/')} 
+          className="text-white/50 hover:text-white transition-colors p-2 -ml-2 rounded-full hover:bg-white/5"
+          title="Back to Home"
+        >
+          <ArrowLeft size={24} strokeWidth={2.5} />
+        </button>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-transparent border border-indigo-500/50 shadow-[0_0_20px_rgba(99,102,241,0.6)]">
+            <Zap size={20} className="text-indigo-400" fill="currentColor" />
+          </div>
+          <span className="font-bold text-2xl italic tracking-tight text-white">RepoSensei</span>
+        </div>
+      </nav>
+
+      {/* Main Content Area */}
+      <div className="flex-1 w-full h-full flex flex-col items-start justify-start px-8 pt-32 md:pt-48 relative overflow-y-auto bg-transparent">
         
+        {/* Container to enforce max width and centered horizontal layout */}
+        <div className="w-full h-full flex flex-col items-center">
+          
+        {/* Plasma Background Layer */}
+        <div style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 0 }}>
+          <Plasma 
+            color="#ff6b35"
+            speed={0.6}
+            direction="forward"
+            scale={1.1}
+            opacity={0.8}
+            mouseInteractive={true}
+          />
+        </div>
+
         {/* Central Card */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-xl z-10"
+          className="w-full max-w-2xl z-10 pointer-events-auto"
         >
-          <div className="flex flex-col items-center mb-10 text-center">
-             <div className="w-16 h-16 bg-accent/20 border border-accent/40 rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(99,102,241,0.2)]">
-                <Sparkles size={32} className="text-accent" />
-             </div>
-             <h1 className="text-4xl font-bold tracking-tight text-white mb-4">Analyze Your Codebase</h1>
-             <p className="text-white/50 text-lg">Enter a GitHub URL to begin the architectural analysis.</p>
+          <div className="flex flex-col items-center mb-12 text-center pointer-events-none">
+             <h1 className="text-5xl md:text-6xl font-bold tracking-tighter text-white mb-6 drop-shadow-xl">Analyze Your Codebase</h1>
+             <p className="text-white/60 text-lg md:text-xl font-medium tracking-wide drop-shadow-md">Enter a GitHub URL to begin the architectural analysis.</p>
           </div>
 
-          <div className="bg-indigo-950/20 backdrop-blur-3xl border border-indigo-500/20 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
-             {/* Nebula Sheen Overlay */}
-             <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent pointer-events-none" />
-             
-             <div className="flex flex-col gap-5 relative z-10">
-                {/* URL Input */}
-                <div className="relative group">
-                   <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none text-white/30 group-focus-within:text-accent transition-colors">
-                      <Link2 size={18} />
-                   </div>
-                   <input 
-                      type="text" 
-                      placeholder="https://github.com/owner/repository"
-                      className="w-full bg-black/40 border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-white placeholder:text-white/20 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all font-mono text-sm"
-                      value={inputUrl}
-                      onChange={(e) => setInputUrl(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleStartAnalysis()}
-                   />
-                </div>
+          {/* Unified Dialog Box Input */}
+          <div className="w-full bg-white/[0.03] backdrop-blur-3xl border border-white/5 rounded-3xl shadow-[0_30px_80px_rgba(0,0,0,0.8)] overflow-hidden relative z-10 mt-8 mb-4">
+            
+            {/* Top Row: Input & Submit */}
+            <div className="flex items-center w-full px-4 py-3">
+               <div className="text-white/40 ml-3 mr-4 font-mono font-bold text-lg select-none">
+                  {'</>'}
+               </div>
+               <input 
+                  type="text" 
+                  placeholder="What repo shall we map?"
+                  className="flex-1 bg-transparent border-none text-white placeholder:text-white/30 focus:outline-none focus:ring-0 text-base md:text-lg font-sans font-medium h-14"
+                  value={inputUrl}
+                  onChange={(e) => setInputUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleStartAnalysis()}
+               />
+               <button 
+                  onClick={handleStartAnalysis}
+                  disabled={!inputUrl.trim()}
+                  className="bg-white hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold rounded-[14px] px-6 py-2.5 transition-colors flex items-center justify-center gap-2 tracking-tight ml-2 shadow-lg"
+               >
+                  Map Repo <ArrowRight size={16} strokeWidth={2.5} />
+               </button>
+            </div>
 
-                <div className="flex gap-3">
-                   {/* Branch Selector */}
-                   <div className="flex-1 relative group">
-                      <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none text-white/30 group-focus-within:text-accent transition-colors">
-                         <GitBranch size={18} />
-                      </div>
-                      <select 
-                        className="w-full bg-black/40 border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-white appearance-none focus:outline-none focus:border-accent/50 transition-all font-mono text-sm"
-                        value={branch}
-                        onChange={(e) => setBranch(e.target.value)}
-                      >
-                         <option value="main">main</option>
-                         <option value="master">master</option>
-                         <option value="develop">develop</option>
-                      </select>
-                   </div>
+            {/* Subtle Divider */}
+            <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-50" />
 
-                   {/* Start Button */}
-                   <button 
-                      onClick={handleStartAnalysis}
-                      disabled={!inputUrl.trim()}
-                      className="flex-[1.2] bg-accent hover:bg-accent/80 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-2xl px-8 transition-all shadow-[0_4px_20px_rgba(99,102,241,0.4)] hover:shadow-[0_6px_25px_rgba(99,102,241,0.6)] flex items-center justify-center gap-2 group whitespace-nowrap"
-                   >
-                      Start Analysis
-                      <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                   </button>
-                </div>
-             </div>
+            {/* Bottom Row: Context Toggles & Status */}
+            <div className="flex items-center justify-between px-6 py-4 bg-black/20">
+               <div className="flex items-center gap-4">
+                  <button className="flex items-center gap-2 bg-[#2a3c75] text-blue-300 px-3 py-1.5 rounded-lg text-sm font-semibold border border-blue-400/20 shadow-[0_0_15px_rgba(59,130,246,0.15)] transition-all">
+                     <Code2 size={14} /> Repo
+                  </button>
+                  <button className="flex items-center gap-2 text-white/40 hover:text-white/80 transition-colors px-3 py-1.5 rounded-lg text-sm font-semibold">
+                     <FolderOpen size={14} /> Local
+                  </button>
+               </div>
+               
+               <div className="flex items-center gap-2 text-white/30 text-xs font-mono font-bold tracking-widest uppercase">
+                  <Cpu size={14} className="text-white/20" />
+                  AI Model · v3.0
+               </div>
+            </div>
+          </div>
 
              {/* Features Tags */}
              <div className="flex flex-wrap justify-center gap-3 mt-8">
@@ -110,7 +138,6 @@ export default function RepoOnboarding() {
                   </div>
                 ))}
              </div>
-          </div>
 
           <div className="grid grid-cols-2 gap-8 mt-12 w-full">
              {/* Recent */}
@@ -148,7 +175,9 @@ export default function RepoOnboarding() {
              </div>
           </div>
         </motion.div>
+        
+        </div>
       </div>
-    </IDELayout>
+    </div>
   );
 }

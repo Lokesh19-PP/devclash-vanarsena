@@ -36,18 +36,19 @@ def build_repo_id(repo_url: str) -> str:
 
 @router.post("/repos/analyze", response_model=AnalyzeResponse)
 async def start_analysis(req: AnalyzeRequest, db: AsyncSession = Depends(get_db)):
-    logger.info("triggering_celery_analysis", repo_url=req.repo_url)
+    logger.info("request_received_start_analysis", repo_url=req.repo_url)
     
     import uuid
-    import traceback
     
     try:
         job_id = str(uuid.uuid4())
         repo_id = build_repo_id(req.repo_url)
+        logger.debug("checking_existing_repo", repo_url=req.repo_url)
         existing_repo_result = await db.execute(select(Repository).filter(Repository.url == req.repo_url))
         existing_repo = existing_repo_result.scalars().first()
         if existing_repo:
             repo_id = existing_repo.id
+            logger.info("using_existing_repo_id", repo_id=repo_id)
         
         # Track the initial task in PostgreSQL first so frontend progress bars work and worker doesn't miss it
         new_job = AnalysisJob(
@@ -57,14 +58,15 @@ async def start_analysis(req: AnalyzeRequest, db: AsyncSession = Depends(get_db)
         )
         db.add(new_job)
         await db.commit()
+        logger.info("job_persisted", job_id=job_id)
         
         # Trigger Celery Task asynchronously
         analyze_repository.apply_async(args=[req.repo_url], task_id=job_id)
+        logger.info("celery_task_dispatched", job_id=job_id)
         
         return AnalyzeResponse(job_id=job_id, status="queued", repo_id=repo_id)
     except Exception as e:
-        print("EXCEPTION CAUGHT IN START_ANALYSIS:")
-        traceback.print_exc()
+        logger.error("start_analysis_failed", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal Error: {str(e)}")
 
 @router.get("/repos/analyze/{job_id}", response_model=AnalyzeResponse)

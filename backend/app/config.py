@@ -20,7 +20,6 @@ class Settings(BaseSettings):
 
     # External AI
     GROQ_API_KEY: str
-    ANTHROPIC_API_KEY: str
 
     # GitHub
     GITHUB_TOKEN: str = ""   # optional but recommended to avoid rate limits

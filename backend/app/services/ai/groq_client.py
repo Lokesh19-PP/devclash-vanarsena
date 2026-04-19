@@ -21,3 +21,17 @@ class GroqClient:
             temperature=0.0
         )
         return response.choices[0].message.content
+
+    async def generate_onboarding(self, prompt: str) -> str:
+        if not self.client:
+            logger.warning("groq_unconfigured", message="Returning mock onboarding markdown")
+            return "# Mocked Onboarding Guide\nThis repo is generated for testing without valid API keys."
+            
+        # Using 70b-versatile as it has high token limits and good reasoning for architecture graph documentation
+        response = await self.client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            max_tokens=3000
+        )
+        return response.choices[0].message.content
