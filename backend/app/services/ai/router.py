@@ -4,7 +4,6 @@ from typing import Any, Dict
 from app.config import Settings
 from app.services.ai.ollama_client import OllamaPool
 from app.services.ai.groq_client import GroqClient
-from app.services.ai.claude_client import ClaudeClient
 from app.services.ai import prompts
 
 class AITask(enum.Enum):
@@ -20,7 +19,6 @@ class AIRouter:
         self.settings = settings
         self.ollama_pool = ollama_pool
         self.groq_client = GroqClient(settings)
-        self.claude_client = ClaudeClient(settings)
 
     async def execute(self, task: AITask, context: Dict[str, Any]) -> Any:
         if task == AITask.SUMMARISE_FILE:
@@ -66,7 +64,7 @@ class AIRouter:
                 file_count=context.get("file_count", 0),
                 file_list=context.get("file_list", "")
             )
-            return await self.claude_client.generate_onboarding(prompt)
+            return await self.groq_client.generate_onboarding(prompt)
 
         elif task == AITask.IMPACT_SUMMARY:
             prompt = prompts.IMPACT_SUMMARY_PROMPT.format(
