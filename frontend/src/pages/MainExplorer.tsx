@@ -163,30 +163,12 @@ export default function MainExplorer() {
      id: k, name: k, files: filesByFolder[k]
   }));
 
-  const topbarCenter = (
-    <div className="flex items-center gap-2 text-sm text-text-secondary">
-      <FolderOpen size={16} className="text-accent" />
-      <span className="font-bold text-white/90">repository</span>
-      <span className="opacity-20">/</span>
-      <span className="text-white/40">workspace</span>
-    </div>
-  );
+  const topbarCenter = null;
 
-  const topbarRight = (
-    <div className="flex items-center gap-4">
-       <div className="flex items-center gap-2 bg-indigo-950/40 border border-indigo-500/20 rounded-xl px-4 py-1.5 text-xs text-white/40 cursor-text hover:bg-indigo-950/60 transition-all">
-        <Search size={14} className="text-accent" />
-        <span className="w-48 text-left">Search repository...</span>
-        <div className="flex gap-1">
-          <span className="bg-white/5 px-1.5 rounded border border-white/10 text-[10px]">CMD</span>
-          <span className="bg-white/5 px-1.5 rounded border border-white/10 text-[10px]">K</span>
-        </div>
-      </div>
-    </div>
-  );
+  const topbarRight = null;
 
   const sidebarContent = (
-    <div className="flex flex-col py-4 font-sans text-[14px] select-none h-full bg-transparent">
+    <div className="flex flex-col py-4 font-sans text-[14px] select-none bg-transparent">
       {/* Root Folder */}
       <div 
         className="flex items-center px-6 py-3 hover:bg-white/5 cursor-pointer text-white group transition-all"
@@ -333,7 +315,7 @@ export default function MainExplorer() {
                 ))}
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8 flex flex-col gap-10 custom-scrollbar relative z-10">
+              <div className="flex-1 overflow-y-auto p-8 flex flex-col gap-10 no-scrollbar relative z-10">
                 <AnimatePresence mode="wait">
                   {activeInfoTab === 'details' && (
                     <motion.div
@@ -351,7 +333,7 @@ export default function MainExplorer() {
                         </div>
                         <div className="p-6 bg-white/5 border border-white/10 rounded-2xl relative group overflow-hidden">
                           <div className="absolute top-0 left-0 w-1 h-full bg-accent shadow-[0_0_15px_#6366f1]" />
-                          <p className="text-white/70 italic text-sm leading-relaxed max-h-48 overflow-y-auto custom-scrollbar">
+                          <p className="text-white/70 italic text-sm leading-relaxed max-h-48 overflow-y-auto no-scrollbar">
                             {activeNode?.type === 'dir'
                               ? `Directory “${activeNode.path || activeNode.label}” — part of the repository tree (see 3D contains edges).`
                               : `"${activeNode?.summary || 'File structure identified. Awaiting complete neural analysis parsing...'}"`}
@@ -363,11 +345,11 @@ export default function MainExplorer() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-white/5 p-5 rounded-2xl border border-white/5 flex flex-col gap-1">
                           <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Couplings</span>
-                          <span className="text-2xl font-bold text-white tracking-tighter">{couplingCount} <span className="text-[10px] font-medium text-white/30 tracking-normal">Direct</span></span>
+                          <span className="text-2xl font-bold text-white tracking-tighter">{couplingCount}</span>
                         </div>
                         <div className="bg-white/5 p-5 rounded-2xl border border-white/5 flex flex-col gap-1">
                           <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Complexity</span>
-                          <span className="text-2xl font-bold text-indigo-400 tracking-tighter">{complexityGrade} <span className="text-[10px] font-medium text-white/30 tracking-normal">Estimated</span></span>
+                          <span className="text-2xl font-bold text-indigo-400 tracking-tighter">{complexityGrade}</span>
                         </div>
                       </div>
 
@@ -403,7 +385,7 @@ export default function MainExplorer() {
                       exit={{ opacity: 0, x: -20 }}
                       className="h-full"
                     >
-                      <div className="bg-black/40 border border-white/10 rounded-2xl p-6 font-mono text-xs text-white/60 leading-relaxed overflow-hidden relative max-h-[420px] overflow-y-auto custom-scrollbar">
+                      <div className="bg-black/40 border border-white/10 rounded-2xl p-6 font-mono text-xs text-white/60 leading-relaxed overflow-hidden relative max-h-[420px] overflow-y-auto no-scrollbar">
                          <div className="absolute top-0 right-0 p-2 opacity-20"><Terminal size={40} /></div>
                          {activeNode?.type === 'dir' ? (
                            <p className="text-white/50 whitespace-pre-wrap">Select a file node to view source. This is a folder in the repo tree.</p>
@@ -428,7 +410,7 @@ export default function MainExplorer() {
                       exit={{ opacity: 0, y: -20 }}
                       className="flex flex-col h-full gap-6"
                     >
-                      <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2 pb-4">
+                      <div className="flex-1 space-y-4 overflow-y-auto no-scrollbar pr-2 pb-4">
                          {chatHistory.length === 0 && (
                             <div className="flex gap-3">
                                 <div className="w-8 h-8 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center shrink-0">
