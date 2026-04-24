@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Folder, FileCode2, ChevronRight, Search, Sparkles, FolderOpen, ArrowUpRight, Terminal } from 'lucide-react';
+import { Grid, Box, Folder, FileCode2, ChevronRight, Search, Sparkles, FolderOpen, ArrowUpRight, Terminal } from 'lucide-react';
 import IDELayout from '../components/IDE/IDELayout';
 import { useStore } from '../store/useStore';
 import ArchitectureGraph3D from '../components/Visualization/ArchitectureGraph3D';
+import ArchitectureGraph2D from '../components/Visualization/ArchitectureGraph2D';
 import { API_BASE } from '../lib/api';
 import {
   coerceCount,
@@ -223,6 +224,7 @@ export default function MainExplorer() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState<{role: 'user'|'assistant', content: string}[]>([]);
   const [fileSearch, setFileSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d');
 
   // Clear chat history when selecting a new node
   useEffect(() => {
@@ -439,7 +441,28 @@ export default function MainExplorer() {
 
   return (
     <IDELayout topbarCenter={topbarCenter} topbarRight={topbarRight} sidebarContent={sidebarContent}>
-      <div className="w-full h-full relative overflow-hidden">
+      <div className="w-full h-full relative overflow-hidden bg-[#020204]">
+        {/* View Mode Toggle */}
+        <div className="absolute top-6 right-6 z-30 flex items-center gap-1 bg-black/40 backdrop-blur-md border border-white/10 p-1 rounded-xl shadow-2xl">
+          <button 
+            onClick={() => setViewMode('2d')}
+            className={`p-2 rounded-lg transition-all flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest
+              ${viewMode === '2d' ? 'bg-accent text-white shadow-[0_0_15px_rgba(99,102,241,0.5)]' : 'text-white/40 hover:text-white hover:bg-white/5'}
+            `}
+          >
+            <Grid size={14} />
+            2D
+          </button>
+          <button 
+            onClick={() => setViewMode('3d')}
+            className={`p-2 rounded-lg transition-all flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest
+              ${viewMode === '3d' ? 'bg-accent text-white shadow-[0_0_15px_rgba(99,102,241,0.5)]' : 'text-white/40 hover:text-white hover:bg-white/5'}
+            `}
+          >
+            <Box size={14} />
+            3D
+          </button>
+        </div>
         {isLoading && nodes.length === 0 && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-xl border border-indigo-500/30 bg-indigo-950/60 text-indigo-300 text-sm flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
@@ -452,12 +475,24 @@ export default function MainExplorer() {
           </div>
         )}
 
-        <ArchitectureGraph3D 
-          nodes={nodes} 
-          edges={edges} 
-          selectedId={selectedNodeId} 
-          onSelect={setSelectedNodeId} 
-        />
+        {/* Graph Area */}
+        <div className="w-full h-full">
+          {viewMode === '3d' ? (
+            <ArchitectureGraph3D 
+              nodes={nodes} 
+              edges={edges} 
+              selectedId={selectedNodeId} 
+              onSelect={setSelectedNodeId} 
+            />
+          ) : (
+            <ArchitectureGraph2D 
+              nodes={nodes} 
+              edges={edges} 
+              selectedId={selectedNodeId} 
+              onSelect={setSelectedNodeId} 
+            />
+          )}
+        </div>
 
         <AnimatePresence>
           {selectedNodeId && (
