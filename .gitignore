@@ -27,3 +27,5 @@ Thumbs.db
 # Analysis artifacts
 backend/cloned_repos/
 backend/.cache/
+venv/
+backend/venv/

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Folder, FileCode2, ChevronRight, Search, Sparkles, FolderOpen, ArrowUpRight, Terminal } from 'lucide-react';
 import IDELayout from '../components/IDE/IDELayout';
@@ -8,8 +8,6 @@ import { API_BASE } from '../lib/api';
 import {
   coerceCount,
   evaluateCouplingTier,
-  evaluateImpactSpread,
-  impactSpreadBarClass,
 } from '../lib/explorerNodeVitals';
 
 const initialNodes3D: any[] = [];
@@ -40,11 +38,32 @@ function metricAccent(metricId: string, numericValue: number): IntelAccent {
   return 'neutral';
 }
 
-const FileItem = ({ file, selectedId, onSelect }: { file: any, selectedId: string | null, onSelect: (id: string | null) => void }) => (
+interface FileTreeNode {
+  id: string;
+  name: string;
+  type: 'file' | 'dir';
+  path: string;
+  children: FileTreeNode[];
+  role?: string;
+  color?: string;
+}
+
+const FileItem = ({ 
+  file, 
+  selectedId, 
+  onSelect,
+  depth = 0 
+}: { 
+  file: any, 
+  selectedId: string | null, 
+  onSelect: (id: string | null) => void,
+  depth?: number
+}) => (
   <div 
-    className={`flex items-center justify-between px-6 py-2.5 cursor-pointer group transition-all duration-300 relative
+    className={`flex items-center justify-between py-2.5 cursor-pointer group transition-all duration-300 relative
       ${selectedId === file.id ? 'bg-white/10' : 'hover:bg-white/5'}
     `}
+    style={{ paddingLeft: `${(depth + 1.5) * 1.5}rem`, paddingRight: '1.5rem' }}
     onClick={() => onSelect(file.id)}
   >
     {selectedId === file.id && (
@@ -56,7 +75,7 @@ const FileItem = ({ file, selectedId, onSelect }: { file: any, selectedId: strin
     <div className="flex items-center text-white/50 group-hover:text-white transition-colors relative z-10">
       <FileCode2 size={18} className={`mr-3 transition-all ${selectedId === file.id ? 'text-accent scale-110' : 'opacity-40'}`} />
       <span className={`truncate max-w-[130px] font-medium tracking-tight ${selectedId === file.id ? 'text-white font-bold' : ''}`}>
-        {file.name.split('/').pop()}
+        {file.name}
       </span>
     </div>
     <span className={`text-[8px] font-black px-2 py-0.5 rounded-[5px] border uppercase tracking-widest opacity-60 group-hover:opacity-100 transition-opacity
@@ -68,6 +87,80 @@ const FileItem = ({ file, selectedId, onSelect }: { file: any, selectedId: strin
     </span>
   </div>
 );
+
+const FolderItem = ({ 
+  folder, 
+  expandedFolders, 
+  toggleFolder, 
+  selectedId, 
+  onSelect,
+  depth = 0
+}: { 
+  folder: FileTreeNode, 
+  expandedFolders: string[], 
+  toggleFolder: (path: string) => void, 
+  selectedId: string | null, 
+  onSelect: (id: string | null) => void,
+  depth?: number
+}) => {
+  const isExpanded = expandedFolders.includes(folder.path);
+  
+  return (
+    <div className="flex flex-col">
+      <div 
+        className={`flex items-center py-2.5 hover:bg-white/5 cursor-pointer transition-all group
+          ${isExpanded ? 'text-white' : 'text-white/40'}
+        `}
+        style={{ paddingLeft: `${(depth + 1.5) * 1.5}rem`, paddingRight: '1.5rem' }}
+        onClick={() => toggleFolder(folder.path)}
+      >
+        <motion.div
+          animate={{ rotate: isExpanded ? 90 : 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <ChevronRight size={14} className="mr-3 opacity-30 group-hover:opacity-100" />
+        </motion.div>
+        <Folder size={18} className={`mr-3 transition-opacity ${isExpanded ? 'opacity-80' : 'opacity-30'}`} />
+        <span className="font-bold text-[13px] tracking-tight">{folder.name}</span>
+      </div>
+
+      <AnimatePresence initial={false}>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            {folder.children
+              .sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === 'dir' ? -1 : 1))
+              .map(child => (
+                child.type === 'dir' ? (
+                  <FolderItem 
+                    key={child.id} 
+                    folder={child} 
+                    expandedFolders={expandedFolders} 
+                    toggleFolder={toggleFolder} 
+                    selectedId={selectedId} 
+                    onSelect={onSelect}
+                    depth={depth + 1}
+                  />
+                ) : (
+                  <FileItem 
+                    key={child.id} 
+                    file={child} 
+                    selectedId={selectedId} 
+                    onSelect={onSelect}
+                    depth={depth + 1}
+                  />
+                )
+              ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 export default function MainExplorer() {
   const { selectedNodeId, setSelectedNodeId, repoId } = useStore();
@@ -174,32 +267,58 @@ export default function MainExplorer() {
     );
   };
 
-  // Filter nodes for the sidebar
-  const displayedNodes = nodes.filter(node => 
-    (node.id || '').toLowerCase().includes(fileSearch.toLowerCase()) || 
-    (node.label || '').toLowerCase().includes(fileSearch.toLowerCase())
-  );
+  // Dynamically build the file tree
+  const fileTree = useMemo(() => {
+    const rootNodes: FileTreeNode[] = [];
+    
+    // Filter nodes by search query
+    const filteredNodes = nodes.filter(node => 
+      node.type !== 'dir' && (
+        (node.id || '').toLowerCase().includes(fileSearch.toLowerCase()) || 
+        (node.label || '').toLowerCase().includes(fileSearch.toLowerCase())
+      )
+    );
 
-  // Dynamically group files
-  const filesByFolder: Record<string, any[]> = { 'root': [] };
-  displayedNodes.forEach(node => {
-     if (node.type === 'dir') return;
-     const relativePath = (node.path || (node.id.includes(':') ? node.id.split(':').slice(1).join(':') : node.id)) as string;
-     const parts = relativePath.split('/');
-     const folderName = parts.length > 1 ? parts[0] : 'root';
-     if (!filesByFolder[folderName]) filesByFolder[folderName] = [];
-     filesByFolder[folderName].push({
-        id: node.id,
-        name: relativePath,
-        role: node.role,
-        color: node.role === 'Entry' ? 'indigo' : node.role === 'Core' ? 'blue' : 'gray'
-     });
-  });
-
-  const rootFiles = filesByFolder['root'] || [];
-  const subFolders = Object.keys(filesByFolder).filter(k => k !== 'root').map(k => ({
-     id: k, name: k, files: filesByFolder[k]
-  }));
+    filteredNodes.forEach(node => {
+      const relativePath = (node.path || (node.id.includes(':') ? node.id.split(':').slice(1).join(':') : node.id)) as string;
+      const parts = relativePath.split('/');
+      
+      let currentLevel = rootNodes;
+      let currentPath = '';
+      
+      parts.forEach((part, index) => {
+        const isFile = index === parts.length - 1;
+        currentPath = currentPath ? `${currentPath}/${part}` : part;
+        
+        if (isFile) {
+          currentLevel.push({
+            id: node.id,
+            name: part,
+            type: 'file',
+            path: relativePath,
+            children: [],
+            role: node.role,
+            color: node.role === 'Entry' ? 'indigo' : node.role === 'Core' ? 'blue' : 'gray'
+          });
+        } else {
+          let dirNode = currentLevel.find(c => c.type === 'dir' && c.name === part);
+          if (!dirNode) {
+            dirNode = {
+              id: `dir:${currentPath}`,
+              name: part,
+              type: 'dir',
+              path: currentPath,
+              children: []
+            };
+            currentLevel.push(dirNode);
+          }
+          currentLevel = dirNode.children;
+        }
+      });
+    });
+    
+    return rootNodes;
+  }, [nodes, fileSearch]);
 
   const topbarCenter = null;
 
@@ -246,46 +365,29 @@ export default function MainExplorer() {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            {/* Direct Files under root */}
-            {rootFiles.map((file) => (
-               <FileItem key={file.id} file={file} selectedId={selectedNodeId} onSelect={setSelectedNodeId} />
-            ))}
-
-            {/* Sub-Folders */}
-            {subFolders.map((folder) => (
-              <div key={folder.id} className="flex flex-col">
-                <div 
-                  className={`flex items-center px-6 py-2.5 hover:bg-white/5 cursor-pointer transition-all pl-10 group
-                    ${expandedFolders.includes(folder.id) ? 'text-white' : 'text-white/40'}
-                  `}
-                  onClick={() => toggleFolder(folder.id)}
-                >
-                  <motion.div
-                    animate={{ rotate: expandedFolders.includes(folder.id) ? 90 : 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <ChevronRight size={14} className="mr-3 opacity-30 group-hover:opacity-100" />
-                  </motion.div>
-                  <Folder size={18} className={`mr-3 transition-opacity ${expandedFolders.includes(folder.id) ? 'opacity-80' : 'opacity-30'}`} />
-                  <span className="font-bold text-[13px] tracking-tight">{folder.name}</span>
-                </div>
-
-                <AnimatePresence>
-                  {expandedFolders.includes(folder.id) && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden pl-6 border-l border-white/5 ml-12"
-                    >
-                      {folder.files.map(file => (
-                        <FileItem key={file.id} file={file} selectedId={selectedNodeId} onSelect={setSelectedNodeId} />
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ))}
+            {fileTree
+              .sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === 'dir' ? -1 : 1))
+              .map(child => (
+                child.type === 'dir' ? (
+                  <FolderItem 
+                    key={child.id} 
+                    folder={child} 
+                    expandedFolders={expandedFolders} 
+                    toggleFolder={toggleFolder} 
+                    selectedId={selectedNodeId} 
+                    onSelect={setSelectedNodeId}
+                    depth={0}
+                  />
+                ) : (
+                  <FileItem 
+                    key={child.id} 
+                    file={child} 
+                    selectedId={selectedNodeId} 
+                    onSelect={setSelectedNodeId}
+                    depth={0}
+                  />
+                )
+              ))}
           </motion.div>
         )}
       </AnimatePresence>
@@ -298,7 +400,6 @@ export default function MainExplorer() {
   const fanOut = coerceCount(activeNode?.out_degree);
   const couplingCount = fanIn + fanOut;
   const couplingTier = evaluateCouplingTier(fanIn, fanOut);
-  const impactSpread = evaluateImpactSpread(activeNode?.impact_score);
 
   const inboundNeighbors = edges
     .filter(e => e.target === selectedNodeId && e.type !== 'contains')
@@ -534,116 +635,117 @@ export default function MainExplorer() {
                               )}
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <HudMetric label="Lines of Code" value={coerceCount(activeNode?.line_count).toLocaleString()} accent="neutral" />
-                            <HudMetric 
-                              label="Structural Complexity" 
-                              value={coerceCount(activeNode?.function_count) + coerceCount(activeNode?.class_count)} 
-                              accent="structure" 
-                            />
-                            <HudMetric label="Functions" value={coerceCount(activeNode?.function_count)} accent="structure" />
-                            <HudMetric label="Classes" value={coerceCount(activeNode?.class_count)} accent="structure" />
-                            <HudMetric label="Exports" value={coerceCount(activeNode?.export_count)} accent="structure" />
-                            <HudMetric label="Language" value={(activeNode?.language || '—').toString()} />
-                            <HudMetric
-                              label="Churn (90 days)"
-                              value={coerceCount(activeNode?.change_frequency)}
-                              accent={metricAccent('churn', coerceCount(activeNode?.change_frequency))}
-                            />
-                          </div>
-                          <div className="grid grid-cols-1 gap-3">
-                            <HudMetric label="Last Modified" value={formatLastTouched(activeNode?.last_modified)} />
-                            <HudMetric label="Primary Author" value={(activeNode?.primary_author || '—').toString()} />
-                          </div>
-                          <div>
-                            <div className="text-[8px] font-bold text-white/25 uppercase tracking-widest mb-2">external_deps</div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {(Array.isArray(activeNode?.external_deps) && activeNode.external_deps.length > 0)
-                                ? activeNode.external_deps.map((p: string) => (
-                                    <span key={p} className="text-[10px] px-2 py-0.5 rounded-lg bg-indigo-500/15 text-indigo-200 border border-indigo-500/25 font-mono">
-                                      {p}
-                                    </span>
-                                  ))
-                                : <span className="text-xs text-white/35">None detected</span>}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[8px] font-bold text-white/25 uppercase tracking-widest mb-2">co_changed_with</div>
-                            <ul className="text-xs text-white/60 space-y-1 max-h-28 overflow-y-auto custom-scrollbar font-mono">
-                              {(Array.isArray(activeNode?.co_changed_with) && activeNode.co_changed_with.length > 0)
-                                ? activeNode.co_changed_with.map((rel: string) => (
-                                    <li key={rel} className="truncate" title={rel}>{rel.split('/').pop() || rel}</li>
-                                  ))
-                                : <li className="text-white/35">No co-change signal in sampled history</li>}
-                            </ul>
-                          </div>
-
-                          <div>
-                            <div className="text-[8px] font-bold text-white/25 uppercase tracking-widest mb-2">Internal Symbols (Definitions)</div>
-                            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto no-scrollbar">
-                              {(Array.isArray(activeNode?.symbols) && activeNode.symbols.length > 0)
-                                ? activeNode.symbols.map((s: string) => (
-                                    <span key={s} className="text-[9px] px-2 py-0.5 rounded-lg bg-accent/5 text-accent/70 border border-accent/20 font-mono">
-                                      {s}
-                                    </span>
-                                  ))
-                                : <span className="text-xs text-white/35">No symbols extracted (Empty file or aggregate)</span>}
-                            </div>
-                          </div>
-
-                          <div className="border-t border-white/5 pt-6 mt-2 grid grid-cols-2 gap-6">
+                          <div className="flex flex-col gap-6">
+                            {/* Metadata & Activity */}
                             <div>
-                                <div className="text-[8px] font-bold text-white/25 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                  <div className="w-1 h-1 rounded-full bg-emerald-500" />
-                                  Dependents (Inbound)
-                                </div>
-                                <ul className="text-[10px] text-white/50 space-y-2 max-h-40 overflow-y-auto no-scrollbar font-mono">
-                                  {inboundNeighbors.length > 0 ? inboundNeighbors.map(nb => (
-                                    <li key={nb.id} className="truncate px-2 py-1 rounded bg-white/[0.03] border border-white/5 hover:text-white transition-colors cursor-help" title={nb.id}>
-                                      {nb.label || nb.id.split('/').pop()}
-                                    </li>
-                                  )) : <li className="italic opacity-30">No inbound links</li>}
-                                </ul>
+                              <div className="text-[9px] font-bold text-white/30 uppercase tracking-widest mb-3 flex items-center gap-2">Metadata & Activity</div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <HudMetric label="Primary Author" value={(activeNode?.primary_author || '—').toString()} />
+                                <HudMetric label="Last Modified" value={formatLastTouched(activeNode?.last_modified)} />
+                                <HudMetric 
+                                  label="Language" 
+                                  value={(activeNode?.language || '—').toString()} 
+                                />
+                                <HudMetric
+                                  label="Churn (90 days)"
+                                  value={coerceCount(activeNode?.change_frequency)}
+                                  accent={metricAccent('churn', coerceCount(activeNode?.change_frequency))}
+                                />
+                              </div>
                             </div>
+
+                            {/* Size & Composition */}
                             <div>
-                                <div className="text-[8px] font-bold text-white/25 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                  <div className="w-1 h-1 rounded-full bg-indigo-500" />
-                                  Dependencies (Outbound)
+                              <div className="text-[9px] font-bold text-white/30 uppercase tracking-widest mb-3 flex items-center gap-2">Size & Composition</div>
+                              <div className="grid grid-cols-3 gap-3">
+                                <HudMetric label="Lines of Code" value={coerceCount(activeNode?.line_count).toLocaleString()} accent="neutral" />
+                                <HudMetric 
+                                  label="Complexity" 
+                                  value={coerceCount(activeNode?.function_count) + coerceCount(activeNode?.class_count)} 
+                                  accent="structure" 
+                                />
+                                <HudMetric label="Exports" value={coerceCount(activeNode?.export_count)} accent="structure" />
+                                <HudMetric label="Functions" value={coerceCount(activeNode?.function_count)} accent="structure" />
+                                <HudMetric label="Classes" value={coerceCount(activeNode?.class_count)} accent="structure" />
+                              </div>
+                            </div>
+
+                            {/* Arrays / Lists */}
+                            <div className="flex flex-col gap-4">
+                              {/* Dependencies & Dependents */}
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white/5 border border-white/5 rounded-xl p-3 flex flex-col min-h-0">
+                                    <div className="text-[8px] font-bold text-white/25 uppercase tracking-widest mb-2 flex items-center gap-2 shrink-0">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
+                                      Dependents (In)
+                                    </div>
+                                    <ul className="text-[10px] text-white/50 space-y-1.5 font-mono flex-1 pr-1 overflow-y-auto max-h-32 no-scrollbar">
+                                      {inboundNeighbors.length > 0 ? inboundNeighbors.map(nb => (
+                                        <li key={nb.id} className="truncate px-2 py-1 rounded bg-white/[0.03] border border-white/5 hover:text-white transition-colors cursor-help" title={nb.id}>
+                                          {nb.label || nb.id.split('/').pop()}
+                                        </li>
+                                      )) : <li className="italic opacity-30 px-1 py-0.5">No inbound links</li>}
+                                    </ul>
                                 </div>
-                                <ul className="text-[10px] text-white/50 space-y-2 max-h-40 overflow-y-auto no-scrollbar font-mono">
-                                  {outboundNeighbors.length > 0 ? outboundNeighbors.map(nb => (
-                                    <li key={nb.id} className="truncate px-2 py-1 rounded bg-white/[0.03] border border-white/5 hover:text-white transition-colors cursor-help" title={nb.id}>
-                                      {nb.label || nb.id.split('/').pop()}
-                                    </li>
-                                  )) : <li className="italic opacity-30">No outbound links</li>}
-                                </ul>
+                                <div className="bg-white/5 border border-white/5 rounded-xl p-3 flex flex-col min-h-0">
+                                    <div className="text-[8px] font-bold text-white/25 uppercase tracking-widest mb-2 flex items-center gap-2 shrink-0">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1]" />
+                                      Dependencies (Out)
+                                    </div>
+                                    <ul className="text-[10px] text-white/50 space-y-1.5 font-mono flex-1 pr-1 overflow-y-auto max-h-32 no-scrollbar">
+                                      {outboundNeighbors.length > 0 ? outboundNeighbors.map(nb => (
+                                        <li key={nb.id} className="truncate px-2 py-1 rounded bg-white/[0.03] border border-white/5 hover:text-white transition-colors cursor-help" title={nb.id}>
+                                          {nb.label || nb.id.split('/').pop()}
+                                        </li>
+                                      )) : <li className="italic opacity-30 px-1 py-0.5">No outbound links</li>}
+                                    </ul>
+                                </div>
+                              </div>
+                              
+                              {/* Other Arrays */}
+                              <div className="grid grid-cols-1 gap-4">
+                                <div className="bg-white/5 border border-white/5 rounded-xl p-3">
+                                  <div className="text-[8px] font-bold text-white/25 uppercase tracking-widest mb-2">External Packages (<span className="text-white/40">{Array.isArray(activeNode?.external_deps) ? activeNode.external_deps.length : 0}</span>)</div>
+                                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto no-scrollbar">
+                                    {(Array.isArray(activeNode?.external_deps) && activeNode.external_deps.length > 0)
+                                      ? activeNode.external_deps.map((p: string) => (
+                                          <span key={p} className="text-[9px] px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-mono shadow-sm">
+                                            {p}
+                                          </span>
+                                        ))
+                                      : <span className="text-[10px] text-white/35 italic">None detected</span>}
+                                  </div>
+                                </div>
+                                <div className="bg-white/5 border border-white/5 rounded-xl p-3">
+                                  <div className="text-[8px] font-bold text-white/25 uppercase tracking-widest mb-2">Co-changed with (<span className="text-white/40">{Array.isArray(activeNode?.co_changed_with) ? activeNode.co_changed_with.length : 0}</span>)</div>
+                                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto no-scrollbar">
+                                    {(Array.isArray(activeNode?.co_changed_with) && activeNode.co_changed_with.length > 0)
+                                      ? activeNode.co_changed_with.map((rel: string) => (
+                                          <span key={rel} className="text-[9px] px-2 py-0.5 rounded-md bg-white/5 text-white/60 border border-white/10 font-mono shadow-sm truncate max-w-[150px]" title={rel}>
+                                            {rel.split('/').pop() || rel}
+                                          </span>
+                                        ))
+                                      : <span className="text-[10px] text-white/35 italic">No co-change signal in history</span>}
+                                  </div>
+                                </div>
+                                <div className="bg-white/5 border border-white/5 rounded-xl p-3">
+                                  <div className="text-[8px] font-bold text-white/25 uppercase tracking-widest mb-2">Internal Symbols (<span className="text-white/40">{Array.isArray(activeNode?.symbols) ? activeNode.symbols.length : 0}</span>)</div>
+                                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto no-scrollbar">
+                                    {(Array.isArray(activeNode?.symbols) && activeNode.symbols.length > 0)
+                                      ? activeNode.symbols.map((s: string) => (
+                                          <span key={s} className="text-[9px] px-2 py-0.5 rounded-md bg-accent/10 text-accent/80 border border-accent/20 font-mono shadow-sm">
+                                            {s}
+                                          </span>
+                                        ))
+                                      : <span className="text-[10px] text-white/35 italic">No symbols extracted</span>}
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </section>
 
-                      <section>
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="text-[10px] font-bold tracking-[0.2em] text-white/30 uppercase">Impact spread</div>
-                          <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
-                            PageRank · {impactSpread.band}
-                          </div>
-                        </div>
-                        <div className="bg-white/5 p-6 rounded-2xl border border-white/5 relative overflow-hidden">
-                          <div className="flex items-end justify-between mb-2 gap-3">
-                            <span className="text-sm font-bold text-white/80 tracking-tight">Graph influence</span>
-                            <span className="text-xs font-bold text-accent tabular-nums shrink-0">{impactSpread.percent}%</span>
-                          </div>
-                          <p className="text-[11px] text-white/45 leading-snug mb-4">{impactSpread.caption}</p>
-                          <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${impactSpread.percent}%` }}
-                              transition={{ delay: 0.5, duration: 1 }}
-                              className={`h-full ${impactSpreadBarClass(impactSpread.band)}`}
-                            />
-                          </div>
-                        </div>
-                      </section>
+
                     </motion.div>
                   )}
 
