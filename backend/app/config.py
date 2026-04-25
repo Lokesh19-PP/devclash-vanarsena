@@ -25,13 +25,15 @@ class Settings(BaseSettings):
     GITHUB_TOKEN: str = ""   # optional but recommended to avoid rate limits
 
     # Analysis limits
-    MAX_FILES_PER_REPO: int = 300
-    MAX_FILE_SIZE_KB: int = 500
+    MAX_FILES_PER_REPO: int = 2000
+    MAX_FILE_SIZE_KB: int = 1024
     SUPPORTED_EXTENSIONS: list[str] = [
-        ".py", ".ts", ".tsx", ".js", ".jsx",
-        ".go", ".java", ".rs", ".rb", ".php",
-        ".html", ".css", ".scss", ".json", ".md",
-        ".yml", ".yaml", ".xml", ".sh", ".sql"
+        ".py", ".ts", ".tsx", ".js", ".jsx", ".c", ".cpp", ".h", ".hpp",
+        ".go", ".java", ".rs", ".rb", ".php", ".cs", ".kt", ".swift",
+        ".html", ".css", ".scss", ".json", ".md", ".txt",
+        ".yml", ".yaml", ".xml", ".sh", ".sql", ".bat", ".ps1",
+        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
+        ".pdf", ".csv", ".env", ".gitignore", ".dockerignore", "dockerfile"
     ]
 
     @property
