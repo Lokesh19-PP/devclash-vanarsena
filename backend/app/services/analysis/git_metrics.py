@@ -103,40 +103,41 @@ def gather_git_file_intel(repo_dir: Path, rel_paths: list[str]) -> dict[str, dic
     n_commits = 0
 
     try:
-        for commit in repo.iter_commits("HEAD", max_count=max_commits):
-            n_commits += 1
-            committed = commit.committed_datetime
-            if committed.tzinfo is None:
-                committed = committed.replace(tzinfo=timezone.utc)
+        # Optimization: use bulk git log to get filenames touched per commit
+        # Format: hash|author|timestamp and then the filenames
+        log_output = repo.git.log(
+            "HEAD",
+            "--pretty=format:COMMIT|%H|%an|%ct",
+            "--name-only",
+            "-n", str(max_commits)
+        ).split("\n")
 
-            author = (commit.author.name or "Unknown").strip() or "Unknown"
-
-            touched: list[str] = []
-            try:
-                for raw in commit.stats.files.keys():
-                    for cand in _expand_stats_file_keys(raw):
-                        hit = _match_tracked_path(cand, tracked, tracked_lower)
-                        if hit:
-                            touched.append(hit)
-            except Exception:
+        current_author = "Unknown"
+        current_dt = now
+        
+        for line in log_output:
+            if not line:
                 continue
-
-            if not touched:
+            if line.startswith("COMMIT|"):
+                parts = line.split("|")
+                if len(parts) >= 4:
+                    current_author = parts[2]
+                    try:
+                        current_dt = datetime.fromtimestamp(int(parts[3]), timezone.utc)
+                    except Exception:
+                        current_dt = now
+                n_commits += 1
                 continue
-
-            for p in touched:
-                if p not in last_modified_dt:
-                    last_modified_dt[p] = committed
-                author_commit_hits[p][author] += 1
-                if committed >= cutoff_90:
-                    change_frequency[p] += 1
-
-            if len(touched) >= 2:
-                for a in touched:
-                    for b in touched:
-                        if a != b:
-                            co_counter[a][b] += 1
-
+            
+            # This is a filename
+            cand = _norm_path(line)
+            hit = _match_tracked_path(cand, tracked, tracked_lower)
+            if hit:
+                if hit not in last_modified_dt:
+                    last_modified_dt[hit] = current_dt
+                author_commit_hits[hit][current_author] += 1
+                if current_dt >= cutoff_90:
+                    change_frequency[hit] += 1
     except Exception as e:
         logger.warning("git_history_walk_failed", error=str(e))
 
